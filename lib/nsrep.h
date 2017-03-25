@@ -78,7 +78,7 @@ struct kr_nsrep
 	unsigned reputation;             /**< NS reputation */
 	const knot_dname_t *name;        /**< NS name */
 	struct kr_context *ctx;          /**< Resolution context */
-	union inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
+	struct kr_inaddr addr[KR_NSREP_MAXADDR];        /**< NS address(es) */
 };
 
 /** @internal Address bytes for given family. */
@@ -96,7 +96,7 @@ struct kr_nsrep
  * @return          0 or an error code
  */
 KR_EXPORT
-int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock);
+int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock, bool tls, struct kr_tls_auth *tls_auth);
 
 /**
  * Elect best nameserver/address pair from the nsset.

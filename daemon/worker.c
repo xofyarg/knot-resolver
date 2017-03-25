@@ -811,7 +811,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 			return qr_task_step(task, NULL, NULL);
 		}
 		conn->data = task;
-		if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr , on_connect) != 0) {
+		if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr, on_connect) != 0) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}

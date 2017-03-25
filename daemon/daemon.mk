@@ -67,7 +67,7 @@ LIBZSCANNER_COMMENTS := \
 daemon/lua/zonefile.lua: daemon/lua/zonefile.lua.in
 	@$(call quiet,SED,$<) -e "s|@LIBZSCANNER_COMMENTS@|$(LIBZSCANNER_COMMENTS)|g" $< > $@
 
-daemon/lua/kres-gen.lua: | $(libkres)
+daemon/lua/kres-gen.lua: daemon/lua/kres-gen.sh | $(libkres)
 	@echo "WARNING: regenerating $@"
 	@# the sed saves some space(s)
 	daemon/lua/kres-gen.sh | sed 's/    /\t/g' > $@

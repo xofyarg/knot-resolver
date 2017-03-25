@@ -144,6 +144,20 @@ union inaddr {
 	struct sockaddr_in6 ip6;
 };
 
+/** DNS over TLS auth options */
+struct kr_tls_auth {
+	char *tls_hostname[256];
+	char *tls_ta_file;
+	char **tls_pin;
+};
+
+/** Not-so-simple storage for IPx address or AF_UNSPEC + DNS over TLS params */
+struct kr_inaddr {
+	bool tls;			/**< DNS over TLS enabled */
+	struct kr_tls_auth *tls_auth;	/**< DNS over TLS Auth Type */
+	union inaddr inaddr;		/**< NS address */
+};
+
 /** Address bytes for given family. */
 KR_EXPORT KR_PURE
 const char *kr_inaddr(const struct sockaddr *addr);

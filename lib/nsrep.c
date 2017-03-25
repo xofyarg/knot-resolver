@@ -42,7 +42,7 @@
 static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t addr_len, int port)
 {
 	if (addr == NULL) {
-		ns->addr[pos].ip.sa_family = AF_UNSPEC;
+		ns->addr[pos].inaddr.ip.sa_family = AF_UNSPEC;
 		return;
 	}
 
@@ -51,9 +51,9 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 
 	switch(addr_len) {
 	case sizeof(struct in_addr):
-		ADDR_SET(ns->addr[pos].ip4.sin, AF_INET, addr, addr_len, port); break;
+		ADDR_SET(ns->addr[pos].inaddr.ip4.sin, AF_INET, addr, addr_len, port); break;
 	case sizeof(struct in6_addr):
-		ADDR_SET(ns->addr[pos].ip6.sin6, AF_INET6, addr, addr_len, port); break;
+		ADDR_SET(ns->addr[pos].inaddr.ip6.sin6, AF_INET6, addr, addr_len, port); break;
 	default: assert(0); break;
 	}
 }
@@ -61,7 +61,7 @@ static void update_nsrep(struct kr_nsrep *ns, size_t pos, uint8_t *addr, size_t 
 static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint8_t *addr[], unsigned score)
 {
 	/* NSLIST is not empty, empty NS cannot be a leader. */
-	if (!addr[0] && ns->addr[0].ip.sa_family != AF_UNSPEC) {
+	if (!addr[0] && ns->addr[0].inaddr.ip.sa_family != AF_UNSPEC) {
 		return;
 	}
 	/* Set new NS leader */
@@ -172,7 +172,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	return kr_ok();
 }
 
-int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock)
+int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock, bool tls, struct kr_tls_auth *tls_auth)
 {
 	if (!qry) {
 		return kr_error(EINVAL);
@@ -188,22 +188,31 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 	}
 
 	if (!sock) {
-		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
+		qry->ns.addr[index].inaddr.ip.sa_family = AF_UNSPEC;
 		return kr_ok();
 	}
-
+	
 	switch (sock->sa_family) {
 	case AF_INET:
-		qry->ns.addr[index].ip4 = *(const struct sockaddr_in *)sock;
+		qry->ns.addr[index].inaddr.ip4 = *(const struct sockaddr_in *)sock;
 		break;
 	case AF_INET6:
-		qry->ns.addr[index].ip6 = *(const struct sockaddr_in6 *)sock;
+		qry->ns.addr[index].inaddr.ip6 = *(const struct sockaddr_in6 *)sock;
 		break;
 	default:
-		qry->ns.addr[index].ip.sa_family = AF_UNSPEC;
+		qry->ns.addr[index].inaddr.ip.sa_family = AF_UNSPEC;
 		return kr_error(EINVAL);
 	}
 
+	if (tls) {
+		fprintf(stderr, "Enabling TLS\n");
+	} else {
+		fprintf(stderr, "Not enabling TLS\n");
+	}
+			
+	qry->ns.addr[index].tls = tls;
+	qry->ns.addr[index].tls_auth = tls_auth;
+	
 	/* Retrieve RTT from cache */
 	struct kr_context *ctx = qry->ns.ctx;
 	unsigned *score = ctx
@@ -218,7 +227,7 @@ int kr_nsrep_set(struct kr_query *qry, size_t index, const struct sockaddr *sock
 
 #define ELECT_INIT(ns, ctx_) do { \
 	(ns)->ctx = (ctx_); \
-	(ns)->addr[0].ip.sa_family = AF_UNSPEC; \
+	(ns)->addr[0].inaddr.ip.sa_family = AF_UNSPEC; \
 	(ns)->reputation = 0; \
 	(ns)->score = KR_NS_MAX_SCORE + 1; \
 } while (0)
@@ -259,12 +268,12 @@ int kr_nsrep_elect_addr(struct kr_query *qry, struct kr_context *ctx)
 int kr_nsrep_update_rtt(struct kr_nsrep *ns, const struct sockaddr *addr,
 			unsigned score, kr_nsrep_lru_t *cache, int umode)
 {
-	if (!ns || !cache || ns->addr[0].ip.sa_family == AF_UNSPEC) {
+	if (!ns || !cache || ns->addr[0].inaddr.ip.sa_family == AF_UNSPEC) {
 		return kr_error(EINVAL);
 	}
 
-	const char *addr_in = kr_nsrep_inaddr(ns->addr[0]);
-	size_t addr_len = kr_nsrep_inaddr_len(ns->addr[0]);
+	const char *addr_in = kr_nsrep_inaddr(ns->addr[0].inaddr);
+	size_t addr_len = kr_nsrep_inaddr_len(ns->addr[0].inaddr);
 	if (addr) { /* Caller provided specific address */
 		if (addr->sa_family == AF_INET) {
 			addr_in = (const char *)&((struct sockaddr_in *)addr)->sin_addr;

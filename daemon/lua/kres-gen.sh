@@ -41,6 +41,7 @@ typedef void (*map_free_f)(void *baton, void *ptr);
 	kr_qarray_t
 	struct kr_rplan
 	struct kr_request
+	struct kr_tls_auth
 EOF
 
 genResType() {
@@ -52,7 +53,7 @@ genResType "struct knot_rrset" | sed 's/\<owner\>/_owner/'
 
 ## Some definitions would need too many deps, so shorten them.
 
-genResType "struct kr_nsrep" | sed '/union/,$ d'
+genResType "struct kr_nsrep" | sed '/struct kr_inaddr/,$ d'
 printf "\t/* beware: hidden stub */\n};\n"
 
 genResType "struct kr_query" | sed '/struct kr_layer_pickle/,$ d'

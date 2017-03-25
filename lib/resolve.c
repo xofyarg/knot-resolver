@@ -130,9 +130,9 @@ static void randomized_qname_case(knot_dname_t * restrict qname, uint32_t secret
 /** Invalidate current NS/addr pair. */
 static int invalidate_ns(struct kr_rplan *rplan, struct kr_query *qry)
 {
-	if (qry->ns.addr[0].ip.sa_family != AF_UNSPEC) {
-		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr[0]);
-		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr[0]);
+	if (qry->ns.addr[0].inaddr.ip.sa_family != AF_UNSPEC) {
+		uint8_t *addr = kr_nsrep_inaddr(qry->ns.addr[0].inaddr);
+		size_t addr_len = kr_nsrep_inaddr_len(qry->ns.addr[0].inaddr);
 		/* @warning _NOT_ thread-safe */
 		static knot_rdata_t rdata_arr[RDATA_ARR_MAX];
 		knot_rdata_init(rdata_arr, addr_len, addr, 0);
@@ -679,7 +679,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	 * time when the query was sent out, not when it was originated.
 	 */
 	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		const struct sockaddr *addr = &qry->ns.addr[i].ip;
+		const struct sockaddr *addr = &qry->ns.addr[i].inaddr.ip;
 		if (addr->sa_family == AF_UNSPEC) {
 			break;
 		}
@@ -1067,7 +1067,7 @@ ns_election:
 	}
 
 	/* Resolve address records */
-	if (qry->ns.addr[0].ip.sa_family == AF_UNSPEC) {
+	if (qry->ns.addr[0].inaddr.ip.sa_family == AF_UNSPEC) {
 		int ret = ns_resolve_addr(qry, request);
 		if (ret != 0) {
 			qry->flags &= ~(QUERY_AWAIT_IPV6|QUERY_AWAIT_IPV4|QUERY_TCP);
@@ -1089,7 +1089,7 @@ ns_election:
 	 */
 
 	gettimeofday(&qry->timestamp, NULL);
-	*dst = &qry->ns.addr[0].ip;
+	*dst = &qry->ns.addr[0].inaddr.ip;
 	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
@@ -1168,14 +1168,14 @@ int kr_resolve_checkout(struct kr_request *request, struct sockaddr *src,
 	knot_dname_to_str(zonecut_str, qry->zone_cut.name, sizeof(zonecut_str));
 	knot_rrtype_to_string(knot_pkt_qtype(packet), type_str, sizeof(type_str));
 	for (size_t i = 0; i < KR_NSREP_MAXADDR; ++i) {
-		struct sockaddr *addr = &qry->ns.addr[i].ip;
+		struct sockaddr *addr = &qry->ns.addr[i].inaddr.ip;
 		if (addr->sa_family == AF_UNSPEC) {
 			break;
 		}
 		if (!kr_inaddr_equal(dst, addr)) {
 			continue;
 		}
-		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i]), ns_str, sizeof(ns_str));
+		inet_ntop(addr->sa_family, kr_nsrep_inaddr(qry->ns.addr[i].inaddr), ns_str, sizeof(ns_str));
 		VERBOSE_MSG(qry, "=> querying: '%s' score: %u zone cut: '%s' m12n: '%s' type: '%s' proto: '%s'\n",
 			ns_str, qry->ns.score, zonecut_str, qname_str, type_str, (qry->flags & QUERY_TCP) ? "tcp" : "udp");
 		break;

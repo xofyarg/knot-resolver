@@ -32,15 +32,19 @@ if has_socket then
 	end
 end
 
-local function addr_split_port(target)
+local function addr_split_port(target, tls)
 	local addr, port = target:match '([^@]*)@?(.*)'
-	port = port and tonumber(port) or 53
+	if (tls) then
+	   port = port and tonumber(port) or 853
+	else
+	   port = port and tonumber(port) or 53
+	end
 	return addr, port
 end
 
 -- String address@port -> sockaddr.
-local function addr2sock(target)
-	local addr, port = addr_split_port(target)
+local function addr2sock(target, tls)
+	local addr, port = addr_split_port(target, tls)
 	sock = ffi.gc(ffi.C.kr_straddr_socket(addr, port), ffi.C.free);
 	if sock == nil then
 		error("target '"..target..'" is not a valid IP address')
@@ -64,17 +68,99 @@ local function mirror(target)
 	end
 end
 
+-- parse TLS auth option
+local function validate_tls_auth(tls_auth)
+   if (type(tls_auth) == 'table') then
+      return tls_auth
+   elseif (tls_auth == nil or tls_auth == false) then
+      return {}
+   else
+      error('invalid tls[\'auth\'] = "'..tostring(tls_auth)..'" specified.')
+   end
+end
+
+-- parse TLS options (only auth = 'xxx')
+local function parse_tls_options(tls)
+   local _tls = {}
+   if (tls == nil) then
+      -- no TLS option was given, so no TLS
+      return nil
+   elseif (type(tls) == 'boolean') then
+      -- Opportunistic TLS auth
+      _tls['enabled'] = tls
+      _tls['auth'] = false
+   elseif (type(tls) == 'table') then
+      -- full TLS configuration was given
+      _tls['enabled'] = true
+      _tls['auth'] = tls['auth']
+   else
+      -- tls = 1 does't really make sense, bail out
+      error('invalid tls option: "'..tostring(target)..'"')
+   end
+
+   -- decode TLS auth params
+   if (type(_tls['auth']) == 'table') then
+      for k, v in pairs(tls_auth) do
+	 if (k ~= 'pin' and k ~= 'hostname' and k ~= 'ca-file') then
+	    error("invalid tls['auth'] configuration")
+	 end
+      end
+   elseif (_tls['auth'] == nil or type(_tls['auth']) == 'boolean') then
+      _tls['auth'] = false
+   else
+      error('invalid tls[\'auth\'] value: "'..tostring(tls['auth'])..'"')
+   end
+   return _tls
+end
+
+-- parse forwarding list including
+local function parse_forward_list(target, called)
+   local list = {}
+   local _entry = {}
+   -- single address
+   if (type(target) == 'string') then
+      _entry['sock'] = addr2sock(target, nil)
+      _entry['tls'] = nil
+      table.insert(list, _entry)
+   -- multiple addresses
+   elseif (type(target) == 'table') then
+      local _list = {}
+      local _tls = parse_tls_options(target['tls'])
+ 
+      for _, _addr in pairs(target) do
+	 if _ ~= 'tls' then
+	    if (type(_addr) == 'string') then
+	       _entry['sock'] = addr2sock(_addr, _tls['enabled'])
+	       _entry['tls'] = _tls
+	       table.insert(list, _entry)
+	    elseif (type(_addr) == 'table') then
+
+	       -- That would be a third level
+	       if (called ~= nil) then
+		  error("You cannot used nested lists in the FORWARD policy")
+	       end
+
+	       -- disallow combinations of global and local TLS settings
+	       if (_tls ~= nil) then
+		  error("When using nested lists, you MUST use per group TLS options")
+	       end
+	       
+	       __list = parse_forward_list(_addr, true)
+	       for _, _sock in pairs(__list) do
+		  table.insert(list, _sock)
+	       end
+	    else
+	       error('address "'..tostring(_addr)..'" MUST be string or table')
+	    end
+	 end
+      end
+   end
+   return list
+end
+
 -- Forward request, and solve as stub query
 local function forward(target)
-	local list = {}
-	if type(target) == 'table' then
-		for _, v in pairs(target) do
-			table.insert(list, addr2sock(v))
-			assert(#list <= 4, 'at most 4 FORWARD targets are supported')
-		end
-	else
-		table.insert(list, addr2sock(target))
-	end
+	local list = parse_forward_list(target)
 	return function(state, req)
 		req = kres.request_t(req)
 		local qry = req:current()
