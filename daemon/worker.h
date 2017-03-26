@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include <gnutls/x509.h>
 #include "daemon/engine.h"
 #include "lib/generic/array.h"
 #include "lib/generic/map.h"
-
 
 /** Worker state (opaque). */
 struct worker_ctx;
@@ -125,7 +125,7 @@ struct qr_task
 	uint16_t timeouts;
 	uint16_t iter_count;
 	uint16_t bytes_remaining;
-	struct sockaddr *addrlist;
+	struct kr_inaddr *addrlist;
 	uv_timer_t *timeout;
 	worker_cb_t on_complete;
 	void *baton;

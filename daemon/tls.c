@@ -39,21 +39,6 @@
 
 static const char *priorities = "NORMAL";
 
-/* gnutls_record_recv and gnutls_record_send */
-struct tls_ctx_t {
-	gnutls_session_t session;
-	bool handshake_done;
-
-	uv_stream_t *handle;
-
-	/* for reading from the network */
-	const uint8_t *buf;
-	ssize_t nread;
-	ssize_t consumed;
-	uint8_t recv_buf[4096];
-	struct tls_credentials *credentials;
-};
-
 /** @internal Debugging facility. */
 #ifdef DEBUG
 #define DEBUG_MSG(fmt...) fprintf(stderr, "[tls] " fmt)
@@ -72,7 +57,7 @@ void tls_setup_logging(bool verbose)
 	gnutls_global_set_log_level(verbose ? 1 : 0);
 }
 
-static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
+ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	const uv_buf_t ub = {(void *)buf, len};
@@ -97,7 +82,7 @@ static ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_
 }
 
 
-static ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
+ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len)
 {
 	struct tls_ctx_t *t = (struct tls_ctx_t *)h;
 	assert(t != NULL);

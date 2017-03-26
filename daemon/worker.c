@@ -27,6 +27,8 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #include "lib/utils.h"
 #include "lib/layer.h"
 #include "daemon/worker.h"
@@ -547,23 +549,88 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	return ret;
 }
 
-static void on_connect(uv_connect_t *req, int status)
+static void _on_connect(uv_connect_t *req, int status, bool tls)
 {
 	struct worker_ctx *worker = get_worker();
 	struct qr_task *task = req->data;
 	uv_stream_t *handle = req->handle;
+	struct session *session = handle->data;
+	struct tls_ctx_t *tls_p = session->tls_ctx;
 	if (qr_valid_handle(task, (uv_handle_t *)req->handle)) {
 		if (status == 0) {
 			struct sockaddr_storage addr;
-			int addr_len = sizeof(addr);
+			int addr_len = sizeof(addr);			
 			uv_tcp_getpeername((uv_tcp_t *)handle, (struct sockaddr *)&addr, &addr_len);
+			if (tls) {
+				gnutls_global_init();
+				session->has_tls = tls;
+
+				struct tls_ctx_t *tls = calloc(1, sizeof(struct tls_ctx_t));
+				if (tls == NULL) {
+					kr_log_error("[tls] failed to allocate TLS context\n");
+					goto on_connect_fail;
+				}
+				int ret = 0;
+				/* TODO: very crude and ugly*/
+				ret = gnutls_init(&tls->session, GNUTLS_CLIENT | GNUTLS_NONBLOCK);
+				if (ret != GNUTLS_E_SUCCESS) {
+					goto on_connect_fail;
+				}
+				ret = gnutls_set_default_priority(tls->session);
+				if (ret != GNUTLS_E_SUCCESS) {
+					goto on_connect_fail;
+				}
+				struct tls_credentials *tls_credentials = calloc(1, sizeof(*tls_credentials));
+				if ((ret = gnutls_certificate_allocate_credentials(&tls_credentials->credentials)) < 0) {
+					kr_log_error("[tls] gnutls_certificate_allocate_credentials() failed: (%d) %s\n",
+						     ret, gnutls_strerror_name(ret));
+					tls_credentials_free(tls_credentials);
+					goto on_connect_fail;
+				}
+				if ((ret = gnutls_certificate_set_x509_system_trust(tls_credentials->credentials)) < 0) {
+					if (ret != GNUTLS_E_UNIMPLEMENTED_FEATURE) {
+						kr_log_error("[tls] warning: gnutls_certificate_set_x509_system_trust() failed: (%d) %s\n",
+							     ret, gnutls_strerror_name(ret));
+						tls_credentials_free(tls_credentials);
+						goto on_connect_fail;
+					}
+				}
+				ret = gnutls_credentials_set(tls->session, GNUTLS_CRD_CERTIFICATE, tls_credentials->credentials);
+				if (ret != GNUTLS_E_SUCCESS) {
+					goto on_connect_fail;
+				}
+				gnutls_session_set_ptr(tls->session, handle);
+				gnutls_transport_set_pull_function(tls->session, kres_gnutls_pull);
+				gnutls_transport_set_push_function(tls->session, kres_gnutls_push);
+				gnutls_transport_set_ptr(tls->session, tls);
+				gnutls_handshake_set_timeout(tls->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT); /* */
+				do {
+					ret = gnutls_handshake(tls->session);
+				} while (ret != GNUTLS_E_SUCCESS && gnutls_error_is_fatal(ret) == 0);
+				if (ret != GNUTLS_E_SUCCESS) {
+					kr_log_error("[tls] handshake failed (%s)\n", gnutls_strerror(ret));
+					gnutls_bye(tls->session, GNUTLS_SHUT_RDWR);
+					goto on_connect_fail;
+				}
+			}
 			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
 		} else {
-			qr_task_step(task, task->addrlist, NULL);
+on_connect_fail:
+			qr_task_step(task, &task->addrlist->inaddr.ip, NULL);
 		}
 	}
 	qr_task_unref(task);
 	req_release(worker, (struct req *)req);
+}
+
+static void on_connect_tcp(uv_connect_t *req, int status)
+{
+	_on_connect(req, status, false);
+}
+
+static void on_connect_tls(uv_connect_t *req, int status)
+{
+	_on_connect(req, status, true);
 }
 
 static void on_timer_close(uv_handle_t *handle)
@@ -582,7 +649,7 @@ static void on_timeout(uv_timer_t *req)
 	struct worker_ctx *worker = task->worker;
 	if (task->leading && task->pending_count > 0) {
 		struct kr_query *qry = array_tail(task->req.rplan.pending);
-		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)task->addrlist;
+		struct sockaddr_in6 *addrlist = (struct sockaddr_in6 *)&(task->addrlist->inaddr.ip);
 		for (uint16_t i = 0; i < MIN(task->pending_count, task->addrlist_count); ++i) {
 			struct sockaddr *choice = (struct sockaddr *)(&addrlist[i]);
 			WITH_VERBOSE {
@@ -606,7 +673,7 @@ static void on_timeout(uv_timer_t *req)
 static bool retransmit(struct qr_task *task)
 {
 	if (task && task->addrlist && task->addrlist_count > 0) {
-		struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)task->addrlist)[task->addrlist_turn];
+		struct sockaddr_in6 *choice = &((struct sockaddr_in6 *)&(task->addrlist->inaddr.ip))[task->addrlist_turn];
 		uv_handle_t *subreq = ioreq_spawn(task, SOCK_DGRAM, choice->sin6_family);
 		if (subreq) { /* Create connection for iterative query */
 			if (qr_task_send(task, subreq, (struct sockaddr *)choice, task->pktbuf) == 0) {
@@ -763,7 +830,7 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 	}
 
 	/* Count available address choices */
-	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
+	struct sockaddr_in6 *choice = (struct sockaddr_in6 *)&(task->addrlist->inaddr.ip);
 	for (size_t i = 0; i < KR_NSREP_MAXADDR && choice->sin6_family != AF_UNSPEC; ++i) {
 		task->addrlist_count += 1;
 		choice += 1;
@@ -804,14 +871,15 @@ static int qr_task_step(struct qr_task *task, const struct sockaddr *packet_sour
 			return qr_task_step(task, NULL, NULL);
 		}
 		const struct sockaddr *addr =
-			packet_source ? packet_source : task->addrlist;
+			packet_source ? packet_source : &(task->addrlist->inaddr.ip);
 		uv_handle_t *client = ioreq_spawn(task, sock_type, addr->sa_family);
 		if (!client) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}
 		conn->data = task;
-		if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr, on_connect) != 0) {
+		const uv_connect_cb on_connect_cb = task->addrlist->tls ? on_connect_tls : on_connect_tcp;
+		if (uv_tcp_connect(conn, (uv_tcp_t *)client, addr, on_connect_cb) != 0) {
 			req_release(task->worker, (struct req *)conn);
 			return qr_task_step(task, NULL, NULL);
 		}

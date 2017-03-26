@@ -960,7 +960,7 @@ static int zone_cut_check(struct kr_request *request, struct kr_query *qry, knot
 	return trust_chain_check(request, qry);
 }
 
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet)
+int kr_resolve_produce(struct kr_request *request, struct kr_inaddr **dst, int *type, knot_pkt_t *packet)
 {
 	struct kr_rplan *rplan = &request->rplan;
 	unsigned ns_election_iter = 0;
@@ -1089,8 +1089,8 @@ ns_election:
 	 */
 
 	gettimeofday(&qry->timestamp, NULL);
-	*dst = &qry->ns.addr[0].inaddr.ip;
-	*type = (qry->flags & QUERY_TCP) ? SOCK_STREAM : SOCK_DGRAM;
+	*dst = &qry->ns.addr[0];
+	*type = ((qry->flags & QUERY_TCP) || qry->ns.addr[0].tls) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
 }
 

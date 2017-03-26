@@ -34,6 +34,21 @@ struct tls_credentials {
 	char *ephemeral_servicename;
 };
 
+/* gnutls_record_recv and gnutls_record_send */
+struct tls_ctx_t {
+	gnutls_session_t session;
+	bool handshake_done;
+
+	uv_stream_t *handle;
+
+	/* for reading from the network */
+	const uint8_t *buf;
+	ssize_t nread;
+	ssize_t consumed;
+	uint8_t recv_buf[4096];
+	struct tls_credentials *credentials;
+};
+
 /*! Toggle verbose logging from TLS context. */
 void tls_setup_logging(bool verbose);
 
@@ -69,3 +84,6 @@ void tls_credentials_log_pins(struct tls_credentials *tls_credentials);
 
 /*! Generate new ephemeral TLS credentials. */
 struct tls_credentials * tls_get_ephemeral_credentials(struct engine *engine);
+
+ssize_t kres_gnutls_push(gnutls_transport_ptr_t h, const void *buf, size_t len);
+ssize_t kres_gnutls_pull(gnutls_transport_ptr_t h, void *buf, size_t len);

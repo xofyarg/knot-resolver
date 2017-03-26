@@ -192,7 +192,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
  * @return         any state
  */
 KR_EXPORT
-int kr_resolve_produce(struct kr_request *request, struct sockaddr **dst, int *type, knot_pkt_t *packet);
+int kr_resolve_produce(struct kr_request *request, struct kr_inaddr **dst, int *type, knot_pkt_t *packet);
 
 /**
  * Finalises the outbound query packet with the knowledge of the IP addresses.
