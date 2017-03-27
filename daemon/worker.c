@@ -38,6 +38,7 @@
 #include "daemon/tls.h"
 
 #define VERBOSE_MSG(qry, fmt...) QRVERBOSE(qry, "wrkr", fmt)
+#define DEBUG_MSG(fmt...) fprintf(stderr, "[tls] " fmt)
 
 /* @internal Union of various libuv objects for freelist. */
 struct req
@@ -555,7 +556,6 @@ static void _on_connect(uv_connect_t *req, int status, bool tls)
 	struct qr_task *task = req->data;
 	uv_stream_t *handle = req->handle;
 	struct session *session = handle->data;
-	struct tls_ctx_t *tls_p = session->tls_ctx;
 	if (qr_valid_handle(task, (uv_handle_t *)req->handle)) {
 		if (status == 0) {
 			struct sockaddr_storage addr;
@@ -599,19 +599,29 @@ static void _on_connect(uv_connect_t *req, int status, bool tls)
 				if (ret != GNUTLS_E_SUCCESS) {
 					goto on_connect_fail;
 				}
+				tls->handle = handle;
+				tls->nread = 0;
+				tls->consumed = 0;
 				gnutls_session_set_ptr(tls->session, handle);
 				gnutls_transport_set_pull_function(tls->session, kres_gnutls_pull);
 				gnutls_transport_set_push_function(tls->session, kres_gnutls_push);
 				gnutls_transport_set_ptr(tls->session, tls);
-				gnutls_handshake_set_timeout(tls->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT); /* */
-				do {
-					ret = gnutls_handshake(tls->session);
-				} while (ret != GNUTLS_E_SUCCESS && gnutls_error_is_fatal(ret) == 0);
-				if (ret != GNUTLS_E_SUCCESS) {
-					kr_log_error("[tls] handshake failed (%s)\n", gnutls_strerror(ret));
-					gnutls_bye(tls->session, GNUTLS_SHUT_RDWR);
-					goto on_connect_fail;
+				gnutls_handshake_set_timeout(tls->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT); /* FIXME */
+				session->tls_ctx = tls;
+				/* Ensure TLS handshake is performed before sending data. */
+				while (!tls->handshake_done) {
+					int err = gnutls_handshake(tls->session);
+					if (err == GNUTLS_E_SUCCESS) {
+						tls->handshake_done = true;
+					} else if (err == GNUTLS_E_AGAIN) {
+						DEBUG_MSG("[tls]: gnutls(1) handshake failed with %s\n", gnutls_strerror(err));
+						continue;
+					} else if (err < 0 && gnutls_error_is_fatal(err)) {
+						DEBUG_MSG("[tls]: gnutls(2) handshake failed with %s\n", gnutls_strerror(err));
+						goto on_connect_fail;
+					}
 				}
+				DEBUG_MSG("[tls]: gnutls handshake complete\n");
 			}
 			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
 		} else {
