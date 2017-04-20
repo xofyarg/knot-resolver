@@ -300,9 +300,10 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 		   !(ctx->options & QUERY_NO_IPV4)) {
 		next_type = KNOT_RRTYPE_A;
 		qry->flags |= QUERY_AWAIT_IPV4;
-		/* Hmm, no useable IPv6 then. */
-		qry->ns.reputation |= KR_NS_NOIP6;
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		if (!(ctx->options & QUERY_NO_IPV6)) {
+			/* Hmm, no useable IPv6 then. */
+			kr_nsrep_flags_set(qry, KR_NS_NOIP6, KR_NS_NOIP_DELAY);
+		}
 	}
 	/* Bail out if the query is already pending or dependency loop. */
 	if (!next_type || kr_rplan_satisfies(qry->parent, qry->ns.name, KNOT_CLASS_IN, next_type)) {
@@ -313,10 +314,11 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			qry->flags |= QUERY_NO_THROTTLE; /* Pick even bad SBELT servers */
 			return kr_error(EAGAIN);
 		}
-		/* No IPv4 nor IPv6, flag server as unuseable. */
+		/* No useable IPv4 nor IPv6. */
 		VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
-		qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-		kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+		if (!(ctx->options & QUERY_NO_IPV4)) {
+			kr_nsrep_flags_set(qry, KR_NS_NOIP4, KR_NS_NOIP_DELAY);
+		}
 		invalidate_ns(rplan, qry);
 		return kr_error(EHOSTUNREACH);
 	}
@@ -327,10 +329,9 @@ static int ns_resolve_addr(struct kr_query *qry, struct kr_request *param)
 			qry->flags |= QUERY_NO_MINIMIZE;
 			qry->flags &= ~QUERY_AWAIT_IPV6;
 			qry->flags &= ~QUERY_AWAIT_IPV4;
-			VERBOSE_MSG(qry, "=> circular dependepcy, retrying with non-minimized name\n");
+			VERBOSE_MSG(qry, "=> circular dependency, retrying with non-minimized name\n");
 		} else {
-			qry->ns.reputation |= KR_NS_NOIP4 | KR_NS_NOIP6;
-			kr_nsrep_update_rep(&qry->ns, qry->ns.reputation, ctx->cache_rep);
+			kr_nsrep_flags_set(qry, KR_NS_NOIP4 | KR_NS_NOIP6, KR_NS_NOIP_DELAY);
 			invalidate_ns(rplan, qry);
 			VERBOSE_MSG(qry, "=> unresolvable NS address, bailing out\n");
 			return kr_error(EHOSTUNREACH);
