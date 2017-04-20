@@ -80,7 +80,8 @@ static void update_nsrep_set(struct kr_nsrep *ns, const knot_dname_t *name, uint
 
 #undef ADDR_SET
 
-static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsigned score, uint8_t *addr[], uint32_t opts)
+static unsigned eval_addr_set(const pack_t *addr_set, kr_nsrep_lru_t *rttcache,
+				unsigned score, uint8_t *addr[], uint32_t opts)
 {
 	/* Name server is better candidate if it has address record. */
 	uint8_t *it = pack_head(*addr_set);
@@ -115,6 +116,8 @@ static unsigned eval_addr_set(pack_t *addr_set, kr_nsrep_lru_t *rttcache, unsign
 
 static int eval_nsrep(const char *k, void *v, void *baton)
 {
+	const knot_dname_t *dname = (const knot_dname_t *)k;
+	const pack_t *addr_set = (pack_t *)v;
 	struct kr_query *qry = baton;
 	struct kr_nsrep *ns = &qry->ns;
 	struct kr_context *ctx = ns->ctx;
@@ -124,8 +127,8 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 
 	/* Fetch NS reputation */
 	if (ctx->cache_rep) {
-		unsigned *cached = lru_get_try(ctx->cache_rep, k,
-					knot_dname_size((const uint8_t *)k));
+		unsigned *cached = lru_get_try(ctx->cache_rep, (const char *)dname,
+						knot_dname_size(dname));
 		if (cached) {
 			reputation = *cached;
 		}
@@ -133,7 +136,6 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 
 	/* Favour nameservers with unknown addresses to probe them,
 	 * otherwise discover the current best address for the NS. */
-	pack_t *addr_set = (pack_t *)v;
 	if (addr_set->len == 0) {
 		score = KR_NS_UNKNOWN;
 		/* If the server doesn't have IPv6, give it disadvantage. */
@@ -160,7 +162,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 	 * at the same time long distance scouts probe other sources (low probability).
 	 * Servers on TIMEOUT (depleted) can be probed by the dice roll only */
 	if (score <= ns->score && (qry->flags & QUERY_NO_THROTTLE || score < KR_NS_TIMEOUT)) {
-		update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+		update_nsrep_set(ns, dname, addr_choice, score);
 		ns->reputation = reputation;
 	} else {
 		/* With 10% chance, probe server with a probability given by its RTT / MAX_RTT */
@@ -169,7 +171,7 @@ static int eval_nsrep(const char *k, void *v, void *baton)
 			if (score >= KR_NS_LONG) {
 				qry->flags |= QUERY_TCP;
 			}
-			update_nsrep_set(ns, (const knot_dname_t *)k, addr_choice, score);
+			update_nsrep_set(ns, dname, addr_choice, score);
 			ns->reputation = reputation;
 			return 1; /* Stop evaluation */
 		}
