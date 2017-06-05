@@ -495,11 +495,21 @@ static int write_extra_ranked_records(struct kr_request *request, knot_section_t
 			continue;
 		}
 		knot_rrset_t *rr = entry->rr;
-		if (!has_dnssec) {
-			if (rr->type != knot_pkt_qtype(answer) && knot_rrtype_is_dnssec(rr->type)) {
+
+		/* Strip DNSSEC RRsets if not wanted;  it's questionable how exactly.
+		 * https://tools.ietf.org/html/rfc4035#section-3.2.1 */
+		if (!has_dnssec && knot_rrtype_is_dnssec(rr->type)) {
+			bool exact_match = section == KNOT_ANSWER
+				&& rr->type == knot_pkt_qtype(answer)
+				&& rr->rclass == knot_pkt_qclass(answer)
+				&& knot_dname_is_equal(rr->owner, knot_pkt_qname(answer));
+			/* TODO: perhaps optimize by hoisting a typical
+			 * pre-condition out of the loop (missing _pure_ attrs.) */
+			if (!exact_match) {
 				continue;
 			}
 		}
+
 		int err = knot_pkt_put(answer, 0, rr, 0);
 		if (err != KNOT_EOK) {
 			if (err == KNOT_ESPACE) {
