@@ -472,10 +472,19 @@ static int write_extra_records(const rr_array_t *arr, knot_pkt_t *answer)
  * @param all_cname optionally output if all written RRs are CNAMEs and RRSIGs of CNAMEs
  * @return error code, ignoring if forced to truncate the packet.
  */
-static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *answer,
+static int write_extra_ranked_records(struct kr_request *request, knot_section_t section,
 				      bool *all_secure, bool *all_cname)
 {
+	bool ok = request && request->answer
+		&& (section == KNOT_ANSWER || section == KNOT_AUTHORITY);
+	if (!ok) {
+		assert(false);
+		return kr_error(EINVAL);
+	}
+	knot_pkt_t *answer = request->answer;
 	const bool has_dnssec = knot_pkt_has_dnssec(answer);
+	const ranked_rr_array_t *arr = section == KNOT_ANSWER
+		? &request->answ_selected : &request->auth_selected;
 	bool all_sec = true;
 	bool all_cn = (all_cname != NULL); /* optim.: init as false if not needed */
 	int err = kr_ok();
@@ -511,7 +520,7 @@ static int write_extra_ranked_records(const ranked_rr_array_t *arr, knot_pkt_t *
 	if (all_cname) {
 		*all_cname = all_cn;
 	}
-	return err;
+	return kr_error(err);
 }
 
 /** @internal Add an EDNS padding RR into the answer if requested and required. */
@@ -603,8 +612,8 @@ static int answer_finalize(struct kr_request *request, int state)
 		if (answer->current < KNOT_ANSWER) {
 			knot_pkt_begin(answer, KNOT_ANSWER);
 		}
-		if (write_extra_ranked_records(&request->answ_selected, answer,
-						&secure, &answ_all_cnames))
+		if (write_extra_ranked_records(request, KNOT_ANSWER, &secure,
+						&answ_all_cnames))
 		{
 			return answer_fail(request);
 		}
@@ -614,7 +623,7 @@ static int answer_finalize(struct kr_request *request, int state)
 	if (answer->current < KNOT_AUTHORITY) {
 		knot_pkt_begin(answer, KNOT_AUTHORITY);
 	}
-	if (write_extra_ranked_records(&request->auth_selected, answer, &secure, NULL)) {
+	if (write_extra_ranked_records(request, KNOT_AUTHORITY, &secure, NULL)) {
 		return answer_fail(request);
 	}
 	/* Write additional records. */
