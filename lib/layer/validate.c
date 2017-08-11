@@ -279,6 +279,10 @@ static void mark_insecure_parents(const struct kr_query *qry)
 	struct kr_query *parent = qry->parent;
 	const uint32_t cut_flags = (QUERY_AWAIT_IPV4 | QUERY_AWAIT_IPV6);
 	while (parent && ((parent->flags & cut_flags) == 0)) {
+		WITH_VERBOSE {
+			VERBOSE_MSG(parent, "<= marked insecure, ");
+			kr_qry_print(parent, "", "\n");
+		}
 		parent->flags &= ~QUERY_DNSSEC_WANT;
 		parent->flags |= QUERY_DNSSEC_INSECURE;
 		if (parent->stype != KNOT_RRTYPE_DS &&

@@ -1148,6 +1148,11 @@ static int forward_trust_chain_check(struct kr_request *request, struct kr_query
 /* @todo: Validator refactoring, keep this in driver for now. */
 static int trust_chain_check(struct kr_request *request, struct kr_query *qry)
 {
+	if (qry->flags & (QUERY_DNSSEC_INSECURE | QUERY_DNSSEC_BOGUS)) {
+		/* Otherwise we might end up with _WANT and _INSECURE/_BOGUS at once. */
+		return KR_STATE_PRODUCE;
+	}
+
 	struct kr_rplan *rplan = &request->rplan;
 	map_t *trust_anchors = &request->ctx->trust_anchors;
 	map_t *negative_anchors = &request->ctx->negative_anchors;
