@@ -21,6 +21,7 @@ MODULEDIR ?= $(LIBDIR)/kdns_modules
 ETCDIR ?= $(PREFIX)/etc/kresd
 ROOTHINTS ?= $(ETCDIR)/root.hints
 COVERAGE_STAGE ?= gcov
+KEYFILE_DEFAULT ?=
 
 # Tools
 CC      ?= cc

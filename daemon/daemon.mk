@@ -64,7 +64,7 @@ daemon-clean: kresd-clean
 		daemon/lua/zonefile.lua
 
 daemon/lua/trust_anchors.lua: daemon/lua/trust_anchors.lua.in
-	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g" $< > $@
+	@$(call quiet,SED,$<) -e "s|@ETCDIR@|$(ETCDIR)|g;s|@KEYFILE_DEFAULT@|$(KEYFILE_DEFAULT)|g" $< > $@
 
 LIBZSCANNER_COMMENTS := \
 	$(shell pkg-config libzscanner --atleast-version=2.4.2 && echo true || echo false)
