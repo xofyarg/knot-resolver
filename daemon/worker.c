@@ -559,6 +559,15 @@ static void on_connect(uv_connect_t *req, int status)
 			uv_tcp_getpeername((uv_tcp_t *)handle, (struct sockaddr *)&addr, &addr_len);
 			qr_task_send(task, (uv_handle_t *)handle, (struct sockaddr *)&addr, task->pktbuf);
 		} else {
+
+			/* Count available address choices */
+			struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
+			for (size_t i = 0; i < KR_NSREP_MAXADDR && choice->sin6_family != AF_UNSPEC; ++i) {
+				task->addrlist_count += 1;
+				choice += 1;
+			}
+			assert(task->addrlist_count > 0);
+
 			qr_task_step(task, task->addrlist, NULL);
 		}
 	}

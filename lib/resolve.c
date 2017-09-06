@@ -878,7 +878,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	if (!packet || packet->size == 0) {
 		if (tried_tcp) {
 			request->state = KR_STATE_FAIL;
-			force_fail = true;
+//			force_fail = true;
 		} else {
 			qry->flags.TCP = true;
 		}
