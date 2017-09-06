@@ -561,12 +561,13 @@ static void on_connect(uv_connect_t *req, int status)
 		} else {
 
 			/* Count available address choices */
+			int addr_cnt = 0;
 			struct sockaddr_in6 *choice = (struct sockaddr_in6 *)task->addrlist;
 			for (size_t i = 0; i < KR_NSREP_MAXADDR && choice->sin6_family != AF_UNSPEC; ++i) {
-				task->addrlist_count += 1;
+				addr_cnt += 1;
 				choice += 1;
 			}
-			assert(task->addrlist_count > 0);
+			assert(addr_cnt > 0);
 
 			qr_task_step(task, task->addrlist, NULL);
 		}
