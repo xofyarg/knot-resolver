@@ -874,9 +874,11 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
 	bool tried_tcp = (qry->flags.TCP);
+	bool force_fail = false; /* TODO: this probably needs a more thorough fix */
 	if (!packet || packet->size == 0) {
 		if (tried_tcp) {
 			request->state = KR_STATE_FAIL;
+			force_fail = true;
 		} else {
 			qry->flags.TCP = true;
 		}
@@ -906,6 +908,14 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 	if (src && !(qry->flags.CACHED)) {
 		update_nslist_score(request, qry, src, packet);
 	}
+
+	if (force_fail) {
+		kr_rplan_pop(rplan, qry);
+		return KR_STATE_FAIL;
+		/* Otherwise we got to call ioreq_spawn with AF_UNSPEC family
+		 * (from qr_task_step) */
+	}
+
 	/* Resolution failed, invalidate current NS. */
 	if (request->state == KR_STATE_FAIL) {
 		invalidate_ns(rplan, qry);
