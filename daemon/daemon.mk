@@ -55,6 +55,7 @@ daemon-install: kresd-install bindings-install
 ifneq ($(SED),)
 	$(SED) -e "s/@VERSION@/$(VERSION)/" -e "s/@DATE@/$(date)/" \
 		-e "s|@MODULEDIR@|$(MODULEDIR)|" \
+		-e "s|@KEYFILE_DEFAULT@|$(KEYFILE_DEFAULT)|" \
 		doc/kresd.8.in > doc/kresd.8
 	$(INSTALL) -d -m 0755 $(DESTDIR)$(MANDIR)/man8/
 	$(INSTALL) -m 0644 doc/kresd.8 $(DESTDIR)$(MANDIR)/man8/
