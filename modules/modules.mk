@@ -23,6 +23,7 @@ endif
 # List of Lua modules
 ifeq ($(HAS_lua),yes)
 modules_TARGETS += ketcd \
+                   kskroll-sentinel \
                    graphite \
                    policy \
                    view \
