@@ -76,6 +76,7 @@ test:linux:amd64:valgrind:
 respdiff:linux:amd64:
   stage: test
   script:
+    - ulimit -n "$(ulimit -Hn)" # applies only for kresd ATM
     - PREFIX=$(pwd)/.local ./ci/respdiff/start-resolvers.sh
     - ./ci/respdiff/run-respdiff-tests.sh
     - cat ./results/respdiff.txt
