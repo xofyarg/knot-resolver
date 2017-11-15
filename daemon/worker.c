@@ -946,6 +946,7 @@ static int qr_task_send(struct qr_task *task, uv_handle_t *handle, struct sockad
 	} else {
 		iorequest_release(worker, ioreq);
 		if (ret == UV_EMFILE) {
+			assert (false && "ret == UV_EMFILE is true");
 			worker->too_many_open = true;
 			worker->rconcurrent_highwatermark = worker->stats.rconcurrent;
 		}
