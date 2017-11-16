@@ -52,6 +52,10 @@ enum kr_cache_flag {
 					*/
 };
 
+/* Prototypes for the 'cache' module implementation. */
+#include "lib/module.h"
+int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
+int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 /**
  * Serialized form of the RRSet with inception timestamp and maximum TTL.
@@ -82,12 +86,6 @@ struct kr_cache
 
 	uint32_t ttl_min, ttl_max; /**< Maximum TTL of inserted entries */
 };
-
-
-
-#include "lib/module.h"
-int cache_lmdb_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
-int cache_lmdb_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
 /**
  * Open/create cache with provided storage options.
