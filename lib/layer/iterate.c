@@ -111,7 +111,7 @@ static bool is_authoritative(const knot_pkt_t *answer, struct kr_query *query)
 	return false;
 }
 
-int kr_response_classify(knot_pkt_t *pkt)
+int kr_response_classify(const knot_pkt_t *pkt)
 {
 	const knot_pktsection_t *an = knot_pkt_section(pkt, KNOT_ANSWER);
 	switch (knot_wire_get_rcode(pkt->wire)) {
@@ -284,7 +284,7 @@ static int update_cut(knot_pkt_t *pkt, const knot_rrset_t *rr,
 			continue;
 		}
 		int ret = kr_zonecut_add(cut, ns_name, NULL);
-		assert(!ret);
+		assert(!ret); (void)ret;
 
 		/* Choose when to use glue records. */
 		bool in_bailiwick = knot_dname_in(current_cut, ns_name);
@@ -316,7 +316,6 @@ static uint8_t get_initial_rank(const knot_rrset_t *rr, const struct kr_query *q
 	uint16_t type = kr_rrset_type_maysig(rr);
 
 	if (qry->flags.CACHED) {
-		assert(rr->additional); // FIXME TMP
 		return rr->additional ? *(uint8_t *)rr->additional : KR_RANK_OMIT;
 		/* ^^ Current use case for "cached" RRs without rank: hints module. */
 	}

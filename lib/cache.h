@@ -25,50 +25,12 @@
 /** When knot_pkt is passed from cache without ->wire, this is the ->size. */
 static const size_t PKT_SIZE_NOWIRE = -1;
 
-// TODO
-#define KR_CACHE_KEY_MAXLEN (KNOT_DNAME_MAXLEN + 100)
 
-/** Cache entry tag */
-enum kr_cache_tag {
-	KR_CACHE_RR   = 'R',
-	KR_CACHE_PKT  = 'P',
-	KR_CACHE_SIG  = 'G',
-	KR_CACHE_USER = 0x80
-};
-
-/** Cache entry flags */
-enum kr_cache_flag {
-	KR_CACHE_FLAG_NONE	  = 0,
-	KR_CACHE_FLAG_WCARD_PROOF = 1, /* Entry contains either packet with wildcard
-	                                * answer either record for which wildcard
-	                                * expansion proof is needed */
-	KR_CACHE_FLAG_OPTOUT	  = 2, /* Entry contains secured packet containing a
-					* closest  encloser proof in which the NSEC3 RR
-					* that covers the "next closer" name
-					* has the Opt-Out bit set
-					*/
-	KR_CACHE_FLAG_NODS	  = 4, /* Entry contains NS rrset
-					* for which DS nonexistence is proven.
-					*/
-};
-
-/* Prototypes for the 'cache' module implementation. */
 #include "lib/module.h"
+/* Prototypes for the 'cache' module implementation. */
 int cache_peek(kr_layer_t *ctx, knot_pkt_t *pkt);
 int cache_stash(kr_layer_t *ctx, knot_pkt_t *pkt);
 
-/**
- * Serialized form of the RRSet with inception timestamp and maximum TTL.
- */
-struct kr_cache_entry
-{
-	uint32_t timestamp;
-	uint32_t ttl;
-	uint16_t count;
-	uint8_t  rank;
-	uint8_t  flags;
-	uint8_t  data[];
-};
 
 /**
  * Cache structure, keeps API, instance and metadata.
@@ -84,7 +46,7 @@ struct kr_cache
 		uint32_t delete;      /**< Number of deletions */
 	} stats;
 
-	uint32_t ttl_min, ttl_max; /**< Maximum TTL of inserted entries */
+	uint32_t ttl_min, ttl_max; /**< TTL limits */
 };
 
 /**
