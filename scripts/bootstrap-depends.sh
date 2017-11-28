@@ -122,7 +122,7 @@ function pkg {
 		fetch_pkg "$1-$3" "$2" $3 >> ${LOG}
 		echo "[x] building $1-$3"
 		shift 4
-		(build_pkg $*) >> ${LOG} 2>&1
+		(build_pkg $*) 2>&1 | tee ${LOG}
 	fi
 }
 
