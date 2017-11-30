@@ -791,9 +791,7 @@ static void update_nslist_rtt(struct kr_context *ctx, struct kr_query *qry, cons
 	}
 
 	/* Calculate total resolution time from the time the query was generated. */
-	struct timeval now;
-	gettimeofday(&now, NULL);
-	long elapsed = time_diff(&qry->timestamp, &now);
+	long elapsed = kr_now() - qry->query_time;
 
 	/* NSs in the preference list prior to the one who responded will be penalised
 	 * with the RETRY timer interval. This is because we know they didn't respond
@@ -861,9 +859,9 @@ static void update_nslist_score(struct kr_request *request, struct kr_query *qry
 	}
 }
 
-bool check_resolution_time(struct kr_query *qry, struct timeval *now)
+bool check_resolution_time(struct kr_query *qry, uint64_t now)
 {
-	long resolving_time = time_diff(&qry->creation_time, now);
+	long resolving_time = now - qry->creation_time;
 	if (resolving_time > KR_RESOLVE_TIME_LIMIT) {
 		WITH_VERBOSE {
 			VERBOSE_MSG(qry, "query resolution time limit exceeded\n");
@@ -887,10 +885,8 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 
 	/* Different processing for network error */
 	struct kr_query *qry = array_tail(rplan->pending);
-	struct timeval now;
-	gettimeofday(&now, NULL);
 	/* Check overall resolution time */
-	if (!check_resolution_time(qry, &now)) {
+	if (!check_resolution_time(qry, kr_now())) {
 		return KR_STATE_FAIL;
 	}
 	bool tried_tcp = (qry->flags.TCP);
@@ -911,7 +907,7 @@ int kr_resolve_consume(struct kr_request *request, const struct sockaddr *src, k
 			ITERATE_LAYERS(request, qry, consume, packet);
 		} else {
 			/* Fill in source and latency information. */
-			request->upstream.rtt = time_diff(&qry->timestamp, &now);
+			request->upstream.rtt = kr_now() - qry->query_time;
 			request->upstream.addr = src;
 			ITERATE_LAYERS(request, qry, consume, packet);
 			/* Clear temporary information */
@@ -1447,8 +1443,7 @@ ns_election:
 	 * Additional query is going to be finalised when calling
 	 * kr_resolve_checkout().
 	 */
-
-	gettimeofday(&qry->timestamp, NULL);
+	qry->query_time = kr_now();
 	*dst = &qry->ns.addr[0].ip;
 	*type = (qry->flags.TCP) ? SOCK_STREAM : SOCK_DGRAM;
 	return request->state;
