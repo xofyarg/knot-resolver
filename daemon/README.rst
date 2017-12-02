@@ -498,6 +498,18 @@ Environment
          end
       end)
 
+.. function:: package_version()
+
+   :return: Current package version.
+
+   This returns current package version (the version of the binary).
+
+      .. code-block:: lua
+
+         > package_version()
+         '1.5.0'
+
+
 Network configuration
 ^^^^^^^^^^^^^^^^^^^^^
 
