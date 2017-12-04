@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
@@ -48,6 +49,14 @@ static inline int cache_purge(struct kr_cache *cache)
 {
 	cache->stats.delete += 1;
 	return cache_op(cache, clear);
+}
+
+/** @internal Set time when clearing cache. */
+static void reset_time(struct kr_cache *cache)
+{
+	cache->last_clear_monotime = kr_now();
+	gettimeofday(&cache->last_clear_timestamp, NULL);
+	
 }
 
 /** @internal Open cache db transaction and check internal data version. */
@@ -97,6 +106,7 @@ int kr_cache_open(struct kr_cache *cache, const struct kr_cdb_api *api, struct k
 	cache->ttl_min = 0;
 	cache->ttl_max = KR_CACHE_DEFAULT_MAXTTL;
 	/* Check cache ABI version */
+	reset_time(cache);
 	(void) assert_right_version(cache);
 	return 0;
 }
@@ -275,6 +285,7 @@ int kr_cache_clear(struct kr_cache *cache)
 	}
 	int ret = cache_purge(cache);
 	if (ret == 0) {
+		reset_time(cache);
 		ret = assert_right_version(cache);
 	}
 	return ret;

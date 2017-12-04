@@ -27,3 +27,4 @@ Knot DNS Resolver modules
 .. include:: ../modules/dnstap/README.rst
 .. include:: ../modules/ta_signal_query/README.rst
 .. include:: ../modules/priming/README.rst
+.. include:: ../modules/time_jump_detection/README.rst

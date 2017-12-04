@@ -34,7 +34,8 @@ modules_TARGETS += ketcd \
                    workarounds \
                    version \
                    ta_signal_query \
-                   priming
+                   priming \
+                   time_jump_detection
 endif
 
 # Make C module
