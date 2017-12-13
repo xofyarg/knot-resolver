@@ -28,3 +28,18 @@ if not trust_anchors.keysets['\0'] and trust_anchors.keyfile_default then
 		)
 	end
 end
+
+-- internal for sanity check, that ta is really loaded in resolver engine
+local function has_ta_for(name)
+	local ffi = require("ffi")
+	local ta = ffi.C.kr_ta_get(kres.context().trust_anchors, kres.str2dname(name))
+	return ta ~= nil
+end
+
+if not trust_anchors.keysets['\0'] or not has_ta_for(".") then
+	if not trust_anchors.ignore_security_error_with_disabled_DNSSEC then
+		panic("There is no trust anchor for '.' domain. Please configure it.")
+	else
+		warn("There is no trust anchor for '.' domain, but you ignore it.")
+	end
+end

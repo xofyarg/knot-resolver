@@ -433,6 +433,16 @@ local add_file = function (path, unmanaged)
 	refresh_plan(keyset, 10 * sec, false)
 end
 
+function disable()
+    for name_wire, keyset in pairs(trust_anchors.keysets) do
+        local name = kres.dname2str(name_wire)
+        warn("Disabling DNSSEC trust anchor for '%s'", name)
+        trustanchor(name, false)
+        event.cancel(keyset.refresh_ev)
+    end
+    trust_anchors.keysets = {}
+    trust_anchors.keyfile_default = nil
+end
 
 -- TA store management, for user docs see ../README.rst
 trust_anchors = {
@@ -455,6 +465,8 @@ trust_anchors = {
 	bootstrap_ca = '@ETCDIR@/icann-ca.pem',
 	-- change empty string to nil
 	keyfile_default = ('@KEYFILE_DEFAULT@' ~= '' and '@KEYFILE_DEFAULT@') or nil,
+	ignore_security_error_with_disabled_DNSSEC = false,
+	disable = disable,
 
 	-- Load keys from a file, 5011-managed by default.
 	-- If managed and the file doesn't exist, try bootstrapping the root into it.
