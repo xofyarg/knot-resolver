@@ -69,3 +69,6 @@ RUN luarocks install luacov
 
 # LuaJIT binary for stand-alone scripting
 RUN apt-get install -y -qqq luajit
+
+# infer for static analysis
+RUN wget -q -O - https://github.com/facebook/infer/releases/download/v0.13.0/infer-linux64-v0.13.0.tar.xz | tar xJ && mv infer-linux64* /var/opt/infer

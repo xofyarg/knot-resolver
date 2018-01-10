@@ -10,6 +10,10 @@ clean: contrib-clean lib-clean daemon-clean client-clean modules-clean \
 doc: doc-html
 lint: $(patsubst %.lua.in,%.lua,$(wildcard */*/*.lua.in))
 	luacheck --codes --formatter TAP .
+infer:
+	infer run -r --fail-on-issue --no-liveness --no-compute-analytics \
+	--no-cxx --disable-issue-type MEMORY_LEAK --disable-issue-type RESOURCE_LEAK \
+	--bufferoverrun --skip-analysis-in-path 'contrib' -- $(MAKE) $(MAKEFLAGS)
 
 .PHONY: all install check clean doc info lint
 

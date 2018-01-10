@@ -16,6 +16,13 @@
 
 #pragma once
 
+/** @internal Annotate for static checkers. */
+#if __INFER__
+#include <uv.h>
+#define uv_close(x, f) (f)(x) /** Provide model for uv_close */
+#define MP_FREELIST_SIZE 0  /** Disable freelists for static checkers. */
+#endif
+
 /* Magic defaults */
 #ifndef LRU_RTT_SIZE
 #define LRU_RTT_SIZE 65536 /**< NS RTT cache size */

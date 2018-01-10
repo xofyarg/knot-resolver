@@ -31,7 +31,11 @@
 #define str(s) #s
 
 /** @internal Annotate for static checkers. */
+#if __INFER__
+#define lua_error(x) longjmp(NULL, 0) /* longjmp has modelled semantics */
+#else
 KR_NORETURN int lua_error (lua_State *L);
+#endif
 
 /** @internal Prefix error with file:line */
 static int format_error(lua_State* L, const char *err)

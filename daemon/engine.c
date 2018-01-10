@@ -39,7 +39,11 @@
 #endif
 
 /** @internal Annotate for static checkers. */
+#if __INFER__
+#define lua_error(x) longjmp(NULL, 0) /* longjmp has modelled semantics */
+#else
 KR_NORETURN int lua_error (lua_State *L);
+#endif
 
 /* Cleanup engine state every 5 minutes */
 const size_t CLEANUP_TIMER = 5*60*1000;
